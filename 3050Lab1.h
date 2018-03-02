@@ -8,7 +8,7 @@
 typedef struct personstruct{
   char* name;
   char* key;
-  struct personstruct *next;
+  char* arrayOfFriends[50];
 } Person;
 
 typedef struct hTable {
@@ -19,13 +19,12 @@ typedef struct hTable {
 
 unsigned long hash(unsigned char *str);
 HashTable* createTable(int, int);
-void destroyTable(HashTable*);
-char* printTable(HashTable*,char*);
+Person* findName(HashTable*,char*,char*);
 void insertTable(HashTable*, unsigned char*, char*);
 void createPerson(HashTable*, char*);
-bool isFriend(char*, char*);
-int beFriend(char*, char*);
-int unFriend(char*, char*);
-void printFriends(char*);
+bool isFriend(HashTable*, char*, char*);
+int beFriend(HashTable*, char*, char*);
+int unFriend(HashTable*, char*, char*);
+void printFriends(HashTable*, char*);
 
 #endif

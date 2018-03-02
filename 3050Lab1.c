@@ -18,6 +18,7 @@ hash(unsigned char *str) // Hash function djb2 that was designed by dan bernstei
      return hash%13;
 }
 
+// Creates the hashtable and sets the size and number of elements accordingly.
 HashTable* createTable(int size, int num_elements) {
 	HashTable *t;
 
@@ -36,40 +37,40 @@ HashTable* createTable(int size, int num_elements) {
 	return t;
 }
 
-void destroyTable(HashTable *t) {
-	struct personstruct *p;
-	struct personstruct *next;
+/* So this is a cool function that I designed. 
+* It is able to find a person given its name (provided there are no duplicates)
+* Even if it is not in the position it should be (given collisions)
+* It is using linear probing until it finds the proper name otherwise the name is not in the table.
+*/
+Person* findName(HashTable *t, char* key, char* name) {
+	struct personstruct *p = NULL;
 
-	for(int i = 0; i < t->size; i++) {
-		for(p = t->table[i]; p != 0; p = next) {
-			next = p->next;
-			if (p != NULL) {
-				free(p->name);
-				free(p->key);
-				free(p);
-			}
+	unsigned long hash1 = hash((unsigned char*) key);
+	unsigned long hash2 = hash((unsigned char*) key);
+
+	while (true) {
+		p = t->table[hash2];
+		if(strcmp((p->name),name) == 0) {
+			return p;
+		} else {
+			hash2++;
+			if (hash2 > 12) hash2 = 0;
+			printf("\n%lu\n",hash2);
 		}
+		if (hash2 == hash1) break;
 	}
-
-	free(t->table);
-	free(t);
-
+	return NULL;
 }
 
-char* printTable(HashTable *t, char* key) {
-	struct personstruct *p;
-
-	for(p = t->table[hash((unsigned char *)key)]; p != 0; p = p->next) {
-		if(strcmp((p->key),key)) {
-			return p->name;
-		}
-	}
-	return "";
-}
-
+// Classic insert into hash table function. Uses that hash function discussed above.
 void insertTable(HashTable *t, unsigned char *key, char *name) {
 	struct personstruct *p;
 	unsigned long hashN;
+
+	if (t->num_elements >= t->size) {
+		printf("The table is full!\n");
+		return;
+	}
 
 	assert(key);
 	assert(name);
@@ -82,15 +83,18 @@ void insertTable(HashTable *t, unsigned char *key, char *name) {
 	p->name = (char*) name;
 
 	hashN = hash(key);
-
-	p->next = t->table[hashN];
+	while (t->table[hashN] != NULL) {
+		hashN++;
+		if (hashN > 12) hashN = 0;
+	}
 	t->table[hashN] = p;
+	printf("%lu\n", hashN);
 
 	t->num_elements++;
 
 	printf("%s has been inserted into the table.\n",name);
 }
-
+// Creates a person and makes the name be all caps to keep consistency
 void createPerson(HashTable *t, char* input) {
 
 	char capInput[255];
@@ -105,35 +109,165 @@ void createPerson(HashTable *t, char* input) {
 	}
 	printf("%s\n",capInput);
 	printf("%s\n",input);
-	int hashed = hash((unsigned char*) capInput);
-	printf("%d\n", hashed);
 
 	insertTable(t,(unsigned char *)capInput,realInput);
-	char* name = printTable(t,"SAM");
-	printf("%s\n",name);
 }
 
-/*bool isFriend(Person*) {
+// This goes through the array to make sure two people are friends
+bool isFriend(HashTable *t, char* name, char* name2) {
+	char capInput[255];
 
+	struct personstruct *p;
+
+	strcpy(capInput, name);
+
+	for(int i = 0; i < strlen(capInput); i++) {
+		capInput[i] = toupper(capInput[i]);
+	}
+
+	p = findName(t,capInput,name);
+
+	int loop = 0;
+
+	while(true) {
+		if (strcmp(p->arrayOfFriends[loop],name2) == 0) {
+			return true;
+		}
+		loop++;
+	}
+	return false;
 }
 
-int beFriend(Person*, Person*) {
+int beFriend(HashTable *t, char* name, char* name2) {
+	char capInput[255];
+	char capInput2[255];
 
+	strcpy(capInput, name);
+	strcpy(capInput2, name2);
+
+	struct personstruct *p;
+
+	struct personstruct *p2;
+
+	for(int i = 0; i < strlen(capInput); i++) {
+		capInput[i] = toupper(capInput[i]);
+	}
+
+	for(int j = 0; j < strlen(capInput2); j++) {
+		capInput2[j] = toupper(capInput2[j]);
+	}
+
+	int i = 0;
+
+	int j = 0;
+
+	p = findName(t,capInput,name);
+	p2 = findName(t,capInput2, name2);
+
+	printf("Adding %s to %s's friend list\n", name, name2);
+	while(true) {
+		if (p->arrayOfFriends[i] == NULL) {
+			p->arrayOfFriends[i] = p2->name;
+			break;
+		}
+
+		else if (strcmp(p->arrayOfFriends[i],p->name) == 0) {
+			printf("These two are already friends!\n");
+			break;
+		}
+		i++;
+	}
+
+	printf("%s\n\n",p->arrayOfFriends[i]);
+
+	printf("Adding %s to %s's friend list\n", name, name2);
+	while(true) {
+		if (p2->arrayOfFriends[j] == NULL) {
+			p2->arrayOfFriends[j] = p->name;
+			break;
+		}
+
+		else if (strcmp(p2->arrayOfFriends[j],p->name) == 0) {
+			printf("These two are already friends!\n");
+			break;
+		}
+
+		j++;
+	}
+
+	printf("%s\n\n",p2->arrayOfFriends[j]);
+
+	printf("Success! %s and %s are now friends\n", name, name2);
+	return 1;
+}
+// Removes the specified name from the table if it can find it.
+int unFriend(HashTable *t, char* name, char* name2) {
+	char capInput[255];
+
+	struct personstruct *p;
+
+	strcpy(capInput, name);
+
+	for(int i = 0; i < strlen(capInput); i++) {
+		capInput[i] = toupper(capInput[i]);
+	}
+
+	p = findName(t,capInput,name);
+
+	int loop = 0;
+	int i = 0;
+	int z = 0;
+
+	char* newArray[50];
+
+	while(p->arrayOfFriends[loop] != NULL) {
+		if (strcmp(p->arrayOfFriends[loop],name2) == 0) {
+			p->arrayOfFriends[loop] = NULL;
+		} else {
+			newArray[i] = p->arrayOfFriends[loop];
+			i++;
+		}
+		loop++;
+	}
+
+	while(z < (loop-1)) {
+		p->arrayOfFriends[z] = newArray[z];
+		z++;
+	}
+	p->arrayOfFriends[z] = NULL;
+	return 0;
 }
 
-int unFriend(Person*, Person*) {
+void printFriends(HashTable *t, char* name) {
+	char capInput[255];
 
+	strcpy(capInput, name);
+
+	struct personstruct *p;
+
+	int j = 0;
+
+	for(int i = 0; i < strlen(capInput); i++) {
+		capInput[i] = toupper(capInput[i]);
+	}
+
+	p = findName(t, capInput, name);
+
+	printf("%s's friends are: ", name);
+	while (p->arrayOfFriends[j] != NULL) {
+		printf("%s, ",p->arrayOfFriends[j]);
+		j++;
+	}
+	printf("\n");
 }
-
-void printFriends(Person*) {
-
-}*/
 
 int main() {
 
-	//char input[255];
 	char *input = malloc(sizeof(char) * 255);
 	char *token = NULL;
+
+	char *name1 = malloc(sizeof(char) * 255);
+	char *name2 = malloc(sizeof(char) * 255);
 
 	int max = 13;
 	int hash_size = 0;
@@ -146,35 +280,53 @@ int main() {
 
 		printf("Command: ");
   		if(fgets(input,255,stdin)) {
-  		
-  			printf("%s",input);
 
   			token = strtok(input, " \n\t");
   			*token = toupper(*token);
 
   			if(strcmp(token,"P") == 0) {
-  				// TODO createPerson();
-  				printf("CREATING A PERSON :)\n");
-  				createPerson(table, strtok(NULL, " \t\n"));
+  				if ((name1 = strtok(NULL, " \t\n")) == NULL) {printf("You need to supply one input...\n"); continue;}
+  				else {
+  					printf("CREATING A PERSON :)\n");
+  					createPerson(table, name1);
+  				}
   			}
+
 			else if(strcmp(token,"F") == 0) {
-				// TODO beFriend();
+				if ((name1 = strtok(NULL, " \t\n")) == NULL || (name2 = strtok(NULL, " \t\n")) == NULL) {printf("You need to supply two inputs...\n"); continue;}
+				else {
 				printf("Friending someone.\n");
+				beFriend(table, name1, name2);
+				}
 			}
 
 			else if(strcmp(token,"U") == 0) {
-				// TODO unFriend();
-				printf("Unfriending someone.\n");
+				if ((name1 = strtok(NULL, " \t\n")) == NULL || (name2 = strtok(NULL, " \t\n")) == NULL) {printf("You need to supply two inputs...\n"); continue;}
+				else {
+					printf("Unfriending someone.\n");
+					unFriend(table, name1, name2);
+				}
 			}
 
 			else if(strcmp(token,"L") == 0) {
-				// TODO printFriends();
-				printf("Printing out all friends of specified person\n");
+				if ((name1 = strtok(NULL, " \t\n")) == NULL) {printf("You need to supply one input...\n"); continue;}
+				else {
+					printFriends(table, name1);
+					printf("Printing out all friends of specified person\n");
+				}
 			}
 
 			else if(strcmp(token,"Q") == 0) {
-				// TODO isFriend();
-				printf("Are these two people friends?\n");
+				if ((name1 = strtok(NULL, " \t\n")) == NULL || (name2 = strtok(NULL, " \t\n")) == NULL) {printf("You need to supply two inputs...\n"); continue;}
+				else {
+					bool answer = isFriend(table, name1, name2);
+					printf("Are these two people friends?\n");
+					if (answer) {
+						printf("Yes they are friends.\n");
+					} else {
+						printf("No they are not friends.\n");
+					}
+				}
 			}
 
 			else if(strcmp(token,"X") == 0) {
@@ -188,14 +340,9 @@ int main() {
 		
 	}
 
-	struct personstruct *p;
-	struct hTable *t;
-	t = table;
-	p = t->table[hash((unsigned char *)("SAM"))];
-	//printf("%s",t->table[hash((unsigned char *)("SAM"))]);
+	printf("Thank you for using this hashtable!\n");
 
-	char* name = printTable(table,"SAM");
-	printf("%s\n",name);
-	//destroyTable(&table);
+	free(input);
+	free(table);
 	return 0;
 }
